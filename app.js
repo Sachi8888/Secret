@@ -35,7 +35,8 @@ mongoose.connect("mongodb://127.0.0.1:27017/userDb",{useNewUrlParser:true});
 const userSchema=new mongoose.Schema ({
     email: String,
     password: String,
-    googleId: String
+    googleId: String,
+    secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -96,13 +97,25 @@ app.get("/login",(req,res)  => {
    res.render("register");
 });
 
-app.get("/secrets", async(req, res) => {
+app.get("/secrets", function(req, res){
+    User.find({ "secret": { $ne: null } })
+    .then((foundUsers) => {
+        if (foundUsers) {
+            res.render("secrets", { usersWithSecrets: foundUsers });
+        }
+    })
+    .catch((err) => {
+        console.log(err);
+    });
+});
+
+app.get("/submit", async(req,res) =>{
     res.set('Cache-Control', 'no-store');
     if(req.isAuthenticated()) {
       try {
         const foundUsers = await User.find({secret:{$ne:null}});
         if(foundUsers) {
-          res.render("secrets", {usersWithSecrets: foundUsers});
+          res.render("submit", {usersWithSecrets: foundUsers});
         }
       }
   
@@ -114,6 +127,26 @@ app.get("/secrets", async(req, res) => {
     else {
         res.redirect("/login");
     }
+    
+});
+
+app.post("/submit", function (req, res) {
+    const submittedSecret = req.body.secret;
+    User.findById(req.user.id)
+        .then((foundUser) => {
+            if (foundUser) {
+                foundUser.secret = submittedSecret;
+                foundUser.save()
+                    .then(() => {
+                        res.redirect("/secrets");
+                    });
+            } else {
+                console.log("User not found");
+            }
+        })
+        .catch((err) => {
+            console.log(err);
+        });
 });
 
 app.post("/register",function (req,res){
